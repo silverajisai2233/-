@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>入所前後訪問 報告書作成</title>
+<title>訪問報告書作成</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -122,13 +122,18 @@
 <body>
 
 <header>
-  <h1>入所前後訪問 報告書作成</h1>
+  <h1 id="appTitleHeading">訪問報告書作成</h1>
   <p>撮影・入力してPDFまたはExcelを書き出します</p>
 </header>
 
 <div id="statusMsg"></div>
 
 <main>
+
+  <section class="card">
+    <h2>書類の種類</h2>
+    <select id="docTypeSelect"></select>
+  </section>
 
   <section class="card">
     <h2>基本情報</h2>
@@ -143,7 +148,7 @@
     <label>報告者</label>
     <input type="text" id="f_hokokusha" placeholder="シルバーステイあじさい　理学療法士　〇〇 〇〇">
     <label>目的</label>
-    <textarea id="f_mokuteki" placeholder="入所前の生活状況の確認と計画書作成、認知症リハビリのため"></textarea>
+    <textarea id="f_mokuteki" placeholder="住宅環境の評価、本人・家族への指導など"></textarea>
   </section>
 
   <section class="card">
@@ -154,14 +159,7 @@
 
   <section class="card">
     <h2>まとめ・考察</h2>
-    <label>自宅での様子</label>
-    <textarea id="s_yousu" placeholder="体調悪化や入院前のADL状況、家庭での役割・参加、介護保険サービスの利用状況、1日の過ごし方、入所に至る経緯など"></textarea>
-    <label>入所生活</label>
-    <textarea id="s_seikatsu" placeholder="退所時にどのレベルまでADLや精神機能等を高めていくのか（生活目標）、施設での生活で注意すること、生活リハビリの内容など"></textarea>
-    <label>リハビリ</label>
-    <textarea id="s_rehabili" placeholder="リハビリの最終ゴール設定とそれに至るまでの目標、現状の問題点に対する予後予測など"></textarea>
-    <label>今後の予定</label>
-    <textarea id="s_yotei" placeholder="自宅に帰った場合の役割、家族への支援依頼、必要な介護保険サービス、住宅環境整備・福祉用具の要否など"></textarea>
+    <div id="summaryFieldsContainer"></div>
     <div class="two-col">
       <div>
         <label>会議実施日</label>
@@ -184,45 +182,157 @@
 </div>
 
 <script>
-/* ============ 定数 ============ */
-const LOCATION_PRESETS = ['門扉〜玄関','玄関','廊下','トイレ','居室','寝室','浴室','その他'];
-
-const PRESET_MEMO = {
-  '門扉〜玄関': '階段の高さ：\n階段の段数：　　段\n手すりの有無（　　）\nその他：',
-  '玄関':      '上がり框の高さ：　　㎝\n手すりの有無（　　）\nその他：',
-  '廊下':      '廊下の幅：\n手すりの有無（　　）\nその他：',
-  'トイレ':     '便座の高さ：　　㎝\n手すりの有無（　　）\nその他：',
-  '居室':      '机の高さ：\n椅子の高さ：\nその他：',
-  '寝室':      'ベッドの高さ：\nベッド柵・手すりの有無（　　）\nその他：',
-  '浴室':      '浴槽の高さ：内側　㎝　外側　㎝\nシャワーチェアの高さ：　　㎝\nその他：',
-  'その他':     ''
+/* ============ 書類の種類ごとの設定 ============ */
+const DOC_TYPES = {
+  nyusho: {
+    label: '入所前後訪問',
+    title: '入所前後訪問指導',
+    locations: ['門扉〜玄関','玄関','廊下','トイレ','居室','寝室','浴室','その他'],
+    memoPresets: {
+      '門扉〜玄関': '階段の高さ：\n階段の段数：　　段\n手すりの有無（　　）\nその他：',
+      '玄関':      '上がり框の高さ：　　㎝\n手すりの有無（　　）\nその他：',
+      '廊下':      '廊下の幅：\n手すりの有無（　　）\nその他：',
+      'トイレ':     '便座の高さ：　　㎝\n手すりの有無（　　）\nその他：',
+      '居室':      '机の高さ：\n椅子の高さ：\nその他：',
+      '寝室':      'ベッドの高さ：\nベッド柵・手すりの有無（　　）\nその他：',
+      '浴室':      '浴槽の高さ：内側　㎝　外側　㎝\nシャワーチェアの高さ：　　㎝\nその他：',
+      'その他':     ''
+    },
+    summary: [
+      {key:'yousu', label:'自宅での様子', placeholder:'体調悪化や入院前のADL状況、家庭での役割・参加、介護保険サービスの利用状況、1日の過ごし方、入所に至る経緯など'},
+      {key:'seikatsu', label:'入所生活', placeholder:'退所時にどのレベルまでADLや精神機能等を高めていくのか（生活目標）、施設での生活で注意すること、生活リハビリの内容など'},
+      {key:'rehabili', label:'リハビリ', placeholder:'リハビリの最終ゴール設定とそれに至るまでの目標、現状の問題点に対する予後予測など'},
+      {key:'yotei', label:'今後の予定', placeholder:'自宅に帰った場合の役割、家族への支援依頼、必要な介護保険サービス、住宅環境整備・福祉用具の要否など'}
+    ]
+  },
+  taisho: {
+    label: '退所前後訪問',
+    title: '退所前後訪問指導',
+    locations: ['門扉〜玄関','玄関','廊下','トイレ','居室','寝室','浴室','その他'],
+    memoPresets: {
+      '門扉〜玄関': '階段の高さ：\n階段の段数：　　段\n手すりの有無（　　）\nその他：',
+      '玄関':      '上がり框の高さ：　　㎝\n手すりの有無（　有　）\nその他：',
+      '廊下':      '廊下の幅：\n手すりの有無（　　）\nその他：',
+      'トイレ':     '便座の高さ：　　㎝\n手すりの有無（　　）\nその他：',
+      '居室':      '机の高さ：\n椅子の高さ：\nその他：',
+      '寝室':      'ベッドの高さ：\nベッド柵・手すりの有無（　　）\nその他：',
+      '浴室':      '浴槽の高さ：内側　㎝　外側　㎝\nシャワーチェアの高さ：　　㎝\nその他：',
+      'その他':     ''
+    },
+    summary: [
+      {key:'kaigoryoku', label:'家族の介護力', placeholder:'同居家族／日中・夜間の介護者／家族が行う介助／家族が不安に感じている事　など'},
+      {key:'fukushiyogu', label:'福祉用具・住宅改修', placeholder:'訪問をした結果、どのような福祉用具が、なぜ必要か。どのような住宅改修が、なぜ必要か。'},
+      {key:'service', label:'退所後に必要なサービス', placeholder:'どのような介護保険サービスが、なぜ必要か。'},
+      {key:'taio', label:'訪問後の対応', placeholder:'訪問して何がわかり、退所までに何が必要か。'}
+    ]
+  },
+  rehamane: {
+    label: 'リハビリテーションマネジメント',
+    title: 'リハビリテーションマネジメント',
+    locations: ['門扉〜玄関','玄関','廊下','居室','寝室','トイレ','洗面所','お風呂','台所','ベランダ','その他'],
+    memoPresets: {
+      '門扉〜玄関': '階段の高さ：　　㎝\n段の数：　　段\n手すりの有無（　　）\nその他：',
+      '玄関':      '上がり框の高さ：　　㎝\n手すりの有無（　　）\nその他：',
+      '廊下':      '廊下の幅：　　㎝\n手すりの有無（　　）\nその他：',
+      '居室':      '椅子の高さ：　　㎝\n机の高さ：　　㎝\n福祉用具の有無（　　）\nその他：',
+      '寝室':      'ベッドの高さ：　　㎝\nベッド柵・手すりの有無（　　）\n福祉用具の有無（　　）\nその他：',
+      'トイレ':     '便座の高さ：　　㎝\nウォシュレットの有無（　　）\n手すりの有無（　　）\nその他：',
+      '洗面所':     '洗面台の高さ：　　㎝\n手すりの有無（　　）\nその他：',
+      'お風呂':     'シャワーチェアーの高さ：　　㎝\n浴槽の高さ：外　　㎝　中　　㎝\n手すりの有無（　　）\nその他：',
+      '台所':      'キッチンの高さ：　　㎝\n棚の高さ（最大）：　　㎝\n冷蔵庫の高さ（最大）：　　㎝\n福祉用具の有無（　　）\nその他：',
+      'ベランダ':    '',
+      'その他':     ''
+    },
+    summary: [
+      {key:'kadai', label:'本人の課題', placeholder:'居宅での実際の生活状況から、本人の生活上の課題やその原因を具体的に記載する。'},
+      {key:'shido', label:'リハビリテーションの観点からの指導・助言', placeholder:'把握した課題に対して、本人・家族・関係職種へ行った具体的な指導・助言内容を記載する。'},
+      {key:'kongo', label:'訪問結果を踏まえた今後のリハビリテーション', placeholder:'居宅訪問で把握した課題を本人の生活目標につなげ、今後の具体的なリハビリ内容・支援方法を記載する。'},
+      {key:'renkei', label:'他サービスとの連携', placeholder:'ケアマネジャーや他サービス事業所と共有・調整した内容を記載する。'}
+    ]
+  }
 };
+
+let currentDocType = 'nyusho';
 
 /* ============ 状態 ============ */
 let state = {
   header: { taisho:'', jisshibi:'', basho:'', member:'', hokokusha:'', mokuteki:'' },
   locations: [],
-  summary: { yousu:'', seikatsu:'', rehabili:'', yotei:'', kaigidate:'', sankasha:'' }
+  summary: { kaigidate:'', sankasha:'' }
 };
 let locIdCounter = 0;
 
-/* ============ 基本情報 / まとめ：双方向バインド ============ */
+/* ============ 基本情報：双方向バインド ============ */
 const fieldMap = [
   ['f_taisho','header','taisho'], ['f_jisshibi','header','jisshibi'], ['f_basho','header','basho'],
   ['f_member','header','member'], ['f_hokokusha','header','hokokusha'], ['f_mokuteki','header','mokuteki'],
-  ['s_yousu','summary','yousu'], ['s_seikatsu','summary','seikatsu'], ['s_rehabili','summary','rehabili'],
-  ['s_yotei','summary','yotei'], ['s_kaigidate','summary','kaigidate'], ['s_sankasha','summary','sankasha']
+  ['s_kaigidate','summary','kaigidate'], ['s_sankasha','summary','sankasha']
 ];
 fieldMap.forEach(([id, group, key]) => {
   const el = document.getElementById(id);
   el.addEventListener('input', () => { state[group][key] = el.value; });
 });
 
+/* ============ 書類の種類の切り替え ============ */
+function getDocType(){ return DOC_TYPES[currentDocType]; }
+function getLocationPresets(){ return getDocType().locations; }
+function getPresetMemo(preset){ return getDocType().memoPresets[preset] || ''; }
+
+function populateDocTypeSelect(){
+  const sel = document.getElementById('docTypeSelect');
+  sel.innerHTML = '';
+  Object.keys(DOC_TYPES).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = DOC_TYPES[key].label;
+    if(key === currentDocType) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => {
+    const hasData = state.locations.length > 0 || Object.keys(state.summary).some(k => k !== 'kaigidate' && k !== 'sankasha' && state.summary[k]);
+    if(hasData && !confirm('書類の種類を切り替えると、入力済みの「住宅環境評価」と「まとめ・考察」がリセットされます。よろしいですか？')){
+      sel.value = currentDocType;
+      return;
+    }
+    currentDocType = sel.value;
+    applyDocType();
+  });
+}
+
+function applyDocType(){
+  const docType = getDocType();
+  document.getElementById('appTitleHeading').textContent = docType.title + ' 報告書作成';
+  document.title = docType.title + ' 報告書作成';
+
+  state.locations = [];
+  const newSummary = { kaigidate: state.summary.kaigidate || '', sankasha: state.summary.sankasha || '' };
+  docType.summary.forEach(f => { newSummary[f.key] = ''; });
+  state.summary = newSummary;
+
+  renderSummaryFields();
+  renderLocations();
+  addLocation();
+}
+
+function renderSummaryFields(){
+  const container = document.getElementById('summaryFieldsContainer');
+  container.innerHTML = '';
+  getDocType().summary.forEach(f => {
+    const label = document.createElement('label');
+    label.textContent = f.label;
+    container.appendChild(label);
+    const ta = document.createElement('textarea');
+    ta.placeholder = f.placeholder;
+    ta.value = state.summary[f.key] || '';
+    ta.addEventListener('input', () => { state.summary[f.key] = ta.value; });
+    container.appendChild(ta);
+  });
+}
+
 /* ============ 場所カード ============ */
 function addLocation(preset){
   const id = 'loc' + (++locIdCounter);
-  const p = preset || LOCATION_PRESETS[0];
-  state.locations.push({ id, preset: p, customName:'', memo: PRESET_MEMO[p] || '', photos: [] });
+  const p = preset || getLocationPresets()[0];
+  state.locations.push({ id, preset: p, customName:'', memo: getPresetMemo(p), photos: [] });
   renderLocations();
 }
 function removeLocation(id){
@@ -241,7 +351,7 @@ function renderLocations(){
     const head = document.createElement('div');
     head.className = 'loc-card-head';
     const select = document.createElement('select');
-    LOCATION_PRESETS.forEach(p => {
+    getLocationPresets().forEach(p => {
       const opt = document.createElement('option');
       opt.value = p; opt.textContent = p;
       if(p === loc.preset) opt.selected = true;
@@ -249,8 +359,9 @@ function renderLocations(){
     });
     select.addEventListener('change', () => {
       loc.preset = select.value;
-      if(!loc.memo || Object.values(PRESET_MEMO).includes(loc.memo)){
-        loc.memo = PRESET_MEMO[loc.preset] || '';
+      const allPresetMemos = Object.values(getDocType().memoPresets);
+      if(!loc.memo || allPresetMemos.includes(loc.memo)){
+        loc.memo = getPresetMemo(loc.preset);
       }
       renderLocations();
     });
@@ -451,13 +562,14 @@ document.getElementById('btnAddLocation').addEventListener('click', () => addLoc
 
 document.getElementById('btnReset').addEventListener('click', () => {
   if(!confirm('入力した内容をすべて消去します。よろしいですか？')) return;
-  state = { header:{taisho:'',jisshibi:'',basho:'',member:'',hokokusha:'',mokuteki:''}, locations:[], summary:{yousu:'',seikatsu:'',rehabili:'',yotei:'',kaigidate:'',sankasha:''} };
+  state = { header:{taisho:'',jisshibi:'',basho:'',member:'',hokokusha:'',mokuteki:''}, locations:[], summary:{kaigidate:'',sankasha:''} };
   fieldMap.forEach(([id]) => { document.getElementById(id).value = ''; });
-  renderLocations();
+  applyDocType();
 });
 
-/* 初期状態で1つ場所カードを用意 */
-addLocation('門扉〜玄関');
+/* ============ 初期化 ============ */
+populateDocTypeSelect();
+applyDocType();
 
 /* ============ 共通ユーティリティ ============ */
 function locName(loc){
@@ -466,7 +578,7 @@ function locName(loc){
 function fileBaseName(){
   const name = (state.header.taisho || '未入力').replace(/[\\/:*?"<>|　\s]/g,'');
   const date = state.header.jisshibi || '';
-  return `入所前後訪問_${name}_${date}`;
+  return `${getDocType().label}_${name}_${date}`;
 }
 function showStatus(msg, autoHide){
   const el = document.getElementById('statusMsg');
@@ -519,7 +631,7 @@ function buildReportDom(){
   title.style.marginBottom = '16px';
   title.style.borderBottom = '3px solid #2f6f68';
   title.style.paddingBottom = '10px';
-  title.textContent = '入所前後訪問指導';
+  title.textContent = getDocType().title;
   root.appendChild(title);
 
   const headerBlock = document.createElement('div');
@@ -592,22 +704,18 @@ function buildReportDom(){
     root.appendChild(block);
   });
 
-  const summaryTitles = [
-    ['自宅での様子', state.summary.yousu], ['入所生活', state.summary.seikatsu],
-    ['リハビリ', state.summary.rehabili], ['今後の予定', state.summary.yotei]
-  ];
   const summaryBlock = document.createElement('div');
   summaryBlock.className = 'pdf-block';
-  summaryTitles.forEach(([label, val]) => {
+  getDocType().summary.forEach(f => {
     const sub = document.createElement('div');
     sub.style.marginBottom = '12px';
     const h = document.createElement('div');
-    h.textContent = '○' + label;
+    h.textContent = '○' + f.label;
     h.style.fontWeight = 'bold';
     h.style.color = '#2f6f68';
     h.style.marginBottom = '4px';
     const p = document.createElement('div');
-    p.textContent = val || '';
+    p.textContent = state.summary[f.key] || '';
     p.style.whiteSpace = 'pre-wrap';
     sub.appendChild(h); sub.appendChild(p);
     summaryBlock.appendChild(sub);
@@ -708,13 +816,13 @@ function dataUrlToBase64AndExt(dataUrl){
 
 async function buildExcel(){
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('入所前後訪問', { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1 } });
+  const ws = wb.addWorksheet(getDocType().label, { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1 } });
   ws.columns = Array.from({length: 8}, () => ({ width: 13 }));
 
   let r = 1;
   ws.mergeCells(r, 1, r, 8);
   const titleCell = ws.getCell(r, 1);
-  titleCell.value = '入所前後訪問指導';
+  titleCell.value = getDocType().title;
   titleCell.font = { bold: true, size: 16 };
   titleCell.alignment = { horizontal: 'center' };
   r += 2;
@@ -779,19 +887,15 @@ async function buildExcel(){
   }
 
   r += 1;
-  const summaryTitles = [
-    ['○自宅での様子', state.summary.yousu], ['○入所生活', state.summary.seikatsu],
-    ['○リハビリ', state.summary.rehabili], ['○今後の予定', state.summary.yotei]
-  ];
-  summaryTitles.forEach(([label, val]) => {
+  getDocType().summary.forEach(f => {
     ws.mergeCells(r, 1, r, 8);
     const lc = ws.getCell(r, 1);
-    lc.value = label;
+    lc.value = '○' + f.label;
     lc.font = { bold: true, color: { argb: 'FF2F6F68' } };
     r++;
     ws.mergeCells(r, 1, r + 3, 8);
     const vc = ws.getCell(r, 1);
-    vc.value = val || '';
+    vc.value = state.summary[f.key] || '';
     vc.alignment = { wrapText: true, vertical: 'top' };
     r += 5;
   });
