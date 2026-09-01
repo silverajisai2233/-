@@ -263,6 +263,7 @@ const DOC_TYPES = {
 };
 
 let currentDocType = 'nyusho';
+const ASSIST_LEVELS = ['自立', '見守り', '一部介助', '全介助'];
 
 /* ============ 状態 ============ */
 let state = {
@@ -342,7 +343,7 @@ function renderSummaryFields(){
 function addLocation(preset){
   const id = 'loc' + (++locIdCounter);
   const p = preset || getLocationPresets()[0];
-  state.locations.push({ id, preset: p, customName:'', memo: getPresetMemo(p), photos: [] });
+  state.locations.push({ id, preset: p, customName:'', memo: getPresetMemo(p), assistLevel: '', photos: [] });
   renderLocations();
 }
 function removeLocation(id){
@@ -395,6 +396,25 @@ function renderLocations(){
     memoArea.value = loc.memo;
     memoArea.addEventListener('input', () => { loc.memo = memoArea.value; });
     card.appendChild(memoArea);
+
+    const assistLabel = document.createElement('label');
+    assistLabel.textContent = '介助レベル';
+    card.appendChild(assistLabel);
+    const assistSelect = document.createElement('select');
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '選択してください';
+    if(!loc.assistLevel) emptyOpt.selected = true;
+    assistSelect.appendChild(emptyOpt);
+    ASSIST_LEVELS.forEach(level => {
+      const opt = document.createElement('option');
+      opt.value = level;
+      opt.textContent = level;
+      if(loc.assistLevel === level) opt.selected = true;
+      assistSelect.appendChild(opt);
+    });
+    assistSelect.addEventListener('change', () => { loc.assistLevel = assistSelect.value; });
+    card.appendChild(assistSelect);
 
     const photoLabel = document.createElement('label');
     photoLabel.textContent = '写真';
@@ -688,6 +708,15 @@ function buildReportDom(){
     memo.style.marginBottom = '8px';
     block.appendChild(memo);
 
+    if(loc.assistLevel){
+      const assist = document.createElement('div');
+      assist.textContent = '介助レベル：' + loc.assistLevel;
+      assist.style.fontWeight = 'bold';
+      assist.style.color = '#204d47';
+      assist.style.marginBottom = '8px';
+      block.appendChild(assist);
+    }
+
     if(loc.photos.length){
       const grid = document.createElement('div');
       grid.style.display = 'flex';
@@ -872,7 +901,11 @@ async function buildExcel(){
     const memoEndRow = memoStartRow + photoRows - 1;
     ws.mergeCells(memoStartRow, 1, memoEndRow, 3);
     const memoCell = ws.getCell(memoStartRow, 1);
-    memoCell.value = loc.memo || '';
+    let memoText = loc.memo || '';
+    if(loc.assistLevel){
+      memoText += (memoText ? '\n\n' : '') + '介助レベル：' + loc.assistLevel;
+    }
+    memoCell.value = memoText;
     memoCell.alignment = { wrapText: true, vertical: 'top' };
 
     let col = 4; // D列から写真開始
